@@ -342,7 +342,7 @@ function drawMinimap(){
 
   // compute player's forward direction in world-space and convert to canvas rotation
   // We want forward=(0,0,-1) (world forward) to map to angle 0 (up on the minimap).
-  const forward = new THREE.Vector3(0,0,-1).applyQuaternion(player.quaternion).normalize();
+  const forward = new THREE.Vector3(0,0,-1).applyQuaternion(player.quaternion).normalize().negate();
   const angle = Math.atan2(forward.x, -forward.z);
   mmCtx.rotate(angle);
 
