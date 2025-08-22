@@ -339,14 +339,20 @@ function drawMinimap(){
   // draw player at center with orientation arrow
   mmCtx.save();
   mmCtx.translate(cx, cy);
-  mmCtx.rotate(-player.rotation.y); // map top = -Z; rotate to match player
+
+  // compute player's forward direction in world-space and convert to canvas rotation
+  // We want forward=(0,0,-1) (world forward) to map to angle 0 (up on the minimap).
+  const forward = new THREE.Vector3(0,0,-1).applyQuaternion(player.quaternion).normalize();
+  const angle = Math.atan2(forward.x, -forward.z);
+  mmCtx.rotate(angle);
+
   // player body
   mmCtx.fillStyle = '#111';
   mmCtx.beginPath();
-  mmCtx.moveTo(0, -6);
   mmCtx.arc(0, 0, 6, 0, Math.PI*2);
   mmCtx.fill();
-  // forward indicator
+
+  // forward indicator (triangle)
   mmCtx.fillStyle = '#ff6b00';
   mmCtx.beginPath();
   mmCtx.moveTo(0,-10);
