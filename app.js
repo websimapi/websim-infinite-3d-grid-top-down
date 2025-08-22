@@ -26,6 +26,8 @@ const player = new THREE.Mesh(
   new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.2, roughness: 0.6 })
 );
 player.position.set(0, 0.3, 0);
+player.maxHealth = 100;
+player.health = player.maxHealth;
 scene.add(player);
 
 // A small arrow on top to indicate forward
@@ -155,6 +157,8 @@ window.addEventListener('keydown', (e) => {
   if (keys.hasOwnProperty(e.code)) keys[e.code] = 1;
   if (e.code === 'KeyQ') cameraYaw += 0.08;
   if (e.code === 'KeyE') cameraYaw -= 0.08;
+  if (e.code === 'KeyK') applyDamage(12); // test: reduce health
+  if (e.code === 'KeyR') { player.health = player.maxHealth; updateHealthUI(); }
   if (e.code === 'Space') { e.preventDefault(); spawnBullet(); }
 });
 window.addEventListener('keyup', (e) => {
@@ -221,6 +225,32 @@ function setupJoystick(){
   });
 }
 setupJoystick();
+
+// health UI bindings & helpers
+const healthEl = document.getElementById('health-ui');
+const healthFill = document.getElementById('health-fill');
+const healthText = document.getElementById('health-text');
+
+function updateHealthUI(){
+  const pct = Math.max(0, player.health) / player.maxHealth;
+  healthFill.style.width = `${pct * 100}%`;
+  healthText.textContent = `${Math.round(pct * 100)}%`;
+  if (pct <= 0) {
+    healthEl.classList.add('dead');
+    player.material.color.set(0x770000);
+  } else {
+    healthEl.classList.remove('dead');
+    player.material.color.set(0x111111);
+  }
+}
+
+function applyDamage(amount){
+  player.health = Math.max(0, player.health - amount);
+  updateHealthUI();
+}
+
+// initialize UI
+updateHealthUI();
 
 // bullets storage + basic shared geometry/material
 const bullets = [];
