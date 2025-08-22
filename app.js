@@ -114,7 +114,6 @@ const gridMaterial = new THREE.ShaderMaterial({
 
       // --- biome color (chunk-based hashed bands + blends) ---
       // sample using discrete chunk coordinates so biomes are stable per chunk
-      vec2 p = vWorld.xz;
       vec2 cell = floor(p / chunkSize);
       float b = fract(sin(cell.x * 12.9898 + cell.y * 78.233) * 43758.5453);
 
