@@ -136,6 +136,10 @@ plane.rotation.x = -Math.PI / 2; // lay flat on XZ
 plane.position.y = 0;
 scene.add(plane);
 
+// Mini-map camera (angled, further out)
+const cameraMini = new THREE.PerspectiveCamera(50, 240 / 150, 0.1, 2000);
+cameraMini.up.set(0, 1, 0);
+
 // Resize handler
 function resize() {
   const w = window.innerWidth;
@@ -147,6 +151,14 @@ function resize() {
   camera.top = frustumSize / 2;
   camera.bottom = -frustumSize / 2;
   camera.updateProjectionMatrix();
+
+  // update minimap camera projection (size will be adjusted each frame too)
+  const frame = document.getElementById('minimap-frame');
+  if (frame) {
+    const rect = frame.getBoundingClientRect();
+    cameraMini.aspect = rect.width / rect.height;
+    cameraMini.updateProjectionMatrix();
+  }
 }
 window.addEventListener('resize', resize, { passive: true });
 resize();
@@ -351,6 +363,37 @@ function animate(now) {
   }
 
   renderer.render(scene, camera);
+
+  // --- minimap render: angled, further-out top-down view in top-right ---
+  // compute viewport in device pixels
+  const DPR = renderer.getPixelRatio();
+  const frameEl = document.getElementById('minimap-frame');
+  if (frameEl) {
+    const rect = frameEl.getBoundingClientRect();
+    const vpW = Math.max(64, Math.floor(rect.width * DPR));
+    const vpH = Math.max(48, Math.floor(rect.height * DPR));
+    const vpX = Math.floor((rect.left) * DPR);
+    const vpY = Math.floor((window.innerHeight - rect.bottom) * DPR);
+
+    renderer.clearDepth(); // allow overlay render on top
+    renderer.setScissorTest(true);
+    renderer.setScissor(vpX, vpY, vpW, vpH);
+    renderer.setViewport(vpX, vpY, vpW, vpH);
+
+    // position minimap camera relative to player for a more angled, farther-out view
+    const miniOffset = new THREE.Vector3(0, 38, 38);
+    cameraMini.position.copy(player.position).add(miniOffset);
+    cameraMini.lookAt(player.position);
+    cameraMini.updateMatrixWorld();
+
+    renderer.render(scene, cameraMini);
+
+    // restore full canvas state
+    renderer.setScissorTest(false);
+    renderer.setViewport(0, 0, Math.floor(window.innerWidth * DPR), Math.floor(window.innerHeight * DPR));
+  }
+  // --- end minimap ---
+
   requestAnimationFrame(animate);
 }
 requestAnimationFrame(animate);

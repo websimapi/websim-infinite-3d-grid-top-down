@@ -80,7 +80,23 @@ body{background:var(--bg);color:var(--accent);overflow:hidden;-webkit-font-smoot
 /* dead state */
 #health-ui.dead #health-fill{ background:#cc2222; opacity:0.9; }
 
+#minimap-frame{
+  position:fixed;
+  right:12px;
+  top:12px;
+  width:240px;
+  height:150px;
+  border-radius:10px;
+  box-shadow:0 6px 18px rgba(0,0,0,0.12);
+  border:1px solid rgba(0,0,0,0.08);
+  background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.02));
+  z-index:16;
+  pointer-events:none;
+}
+
+/* slightly smaller on narrow screens */
 @media (max-width:720px){
+  #minimap-frame{ width:170px; height:110px; right:10px; top:10px; }
   #bottom-controls{ right:12px; bottom:12px; }
   .fire-button{ padding:16px 20px; font-size:17px; border-radius:16px; }
   #health-bar{ width:110px; height:14px; }
