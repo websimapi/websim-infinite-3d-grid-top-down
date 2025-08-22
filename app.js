@@ -155,12 +155,21 @@ resize();
 const minimap = document.getElementById('minimap');
 const mmCtx = minimap.getContext('2d');
 function resizeMinimap(){
+  // ensure the canvas backing buffer matches the CSS size and DPR
+  const rect = minimap.getBoundingClientRect();
+  const cssW = Math.max(64, Math.round(rect.width));
+  const cssH = Math.max(64, Math.round(rect.height));
   const dpr = Math.min(2, window.devicePixelRatio || 1);
-  const cssW = Math.round(getComputedStyle(minimap).width.replace('px',''));
-  const cssH = Math.round(getComputedStyle(minimap).height.replace('px',''));
-  minimap.width = Math.max(64, cssW) * dpr;
-  minimap.height = Math.max(64, cssH) * dpr;
-  mmCtx.setTransform(dpr,0,0,dpr,0,0);
+  // update canvas pixel buffer only when size changed (prevents unnecessary resets)
+  if (minimap.width !== cssW * dpr || minimap.height !== cssH * dpr) {
+    minimap.width = cssW * dpr;
+    minimap.height = cssH * dpr;
+    // use resetTransform + scale to avoid accumulating transforms
+    mmCtx.setTransform(1,0,0,1,0,0);
+    mmCtx.scale(dpr, dpr);
+    // sensible rendering flags
+    mmCtx.imageSmoothingEnabled = true;
+  }
 }
 resizeMinimap();
 window.addEventListener('resize', resizeMinimap, { passive: true });
@@ -296,13 +305,18 @@ if (fireBtn) {
 
 // Draw a simple top-down minimap each frame
 function drawMinimap(){
-  const w = minimap.width / (window.devicePixelRatio || 1);
-  const h = minimap.height / (window.devicePixelRatio || 1);
-  mmCtx.clearRect(0,0,w,h);
+  // compute current CSS size (kept in sync by resizeMinimap)
+  const rect = minimap.getBoundingClientRect();
+  const w = Math.max(64, Math.round(rect.width));
+  const h = Math.max(64, Math.round(rect.height));
+
+  // clear using CSS-space coordinates (canvas has been scaled by DPR in resize)
+  mmCtx.clearRect(0, 0, w, h);
+
   // background + border
-  mmCtx.fillStyle = 'rgba(255,255,255,0.9)';
+  mmCtx.fillStyle = 'rgba(255,255,255,0.92)';
   mmCtx.fillRect(0,0,w,h);
-  mmCtx.strokeStyle = 'rgba(0,0,0,0.08)';
+  mmCtx.strokeStyle = 'rgba(0,0,0,0.06)';
   mmCtx.lineWidth = 1;
   mmCtx.strokeRect(0.5,0.5,w-1,h-1);
 
@@ -311,7 +325,7 @@ function drawMinimap(){
   const scale = (Math.min(w,h) * 0.5 - 8) / viewRadius;
   const cx = w * 0.5, cy = h * 0.5;
 
-  // draw axes (camera-relative orientation not necessary; top = -Z)
+  // draw subtle crosshair
   mmCtx.strokeStyle = 'rgba(0,0,0,0.06)';
   mmCtx.lineWidth = 1;
   mmCtx.beginPath();
@@ -321,24 +335,24 @@ function drawMinimap(){
   mmCtx.lineTo(cx, cy + 4);
   mmCtx.stroke();
 
-  // draw bullets
+  // draw bullets (rounded positions to avoid pixel trails/artifacts)
   mmCtx.fillStyle = '#ff6b00';
   for (let i = 0; i < bullets.length; i++){
-    const b = bullets[i].mesh.position;
-    const dx = (b.x - player.position.x) * scale;
-    const dz = (b.z - player.position.z) * scale;
-    const px = cx + dx;
-    const py = cy + dz;
-    // only draw if within map bounds (simple cull)
-    if (px < -8 || px > w+8 || py < -8 || py > h+8) continue;
+    const bpos = bullets[i].mesh.position;
+    const dx = (bpos.x - player.position.x) * scale;
+    const dz = (bpos.z - player.position.z) * scale;
+    const px = Math.round(cx + dx);
+    const py = Math.round(cy + dz);
+    // simple cull to keep things tidy
+    if (px < -8 || px > w + 8 || py < -8 || py > h + 8) continue;
     mmCtx.beginPath();
     mmCtx.arc(px, py, 3, 0, Math.PI*2);
     mmCtx.fill();
   }
 
-  // draw player at center with orientation arrow
+  // draw player at center with orientation arrow (use integer positions)
   mmCtx.save();
-  mmCtx.translate(cx, cy);
+  mmCtx.translate(Math.round(cx), Math.round(cy));
 
   // compute player's forward direction in world-space and convert to canvas rotation
   // We want forward=(0,0,-1) (world forward) to map to angle 0 (up on the minimap).
