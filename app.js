@@ -71,7 +71,8 @@ const gridMaterial = new THREE.ShaderMaterial({
     gridSpacing: { value: 1.0 },
     lineThickness: { value: 0.02 },
     fadeDistance: { value: 60.0 },
-    cameraPos: { value: new THREE.Vector3() }
+    cameraPos: { value: new THREE.Vector3() },
+    chunkSize: { value: 8.0 } // <--- added chunkSize uniform for chunk-based biomes
   },
   vertexShader: /* glsl */`
     varying vec3 vWorld;
@@ -90,6 +91,7 @@ const gridMaterial = new THREE.ShaderMaterial({
     uniform float lineThickness;
     uniform float fadeDistance;
     uniform vec3 cameraPos;
+    uniform float chunkSize; // <--- declare chunkSize uniform
 
     // anti-aliased grid line
     float gridLine(in float coord, in float spacing, in float thickness){
@@ -110,8 +112,12 @@ const gridMaterial = new THREE.ShaderMaterial({
       float gX = gridLine(p.x, gridSpacing, lineThickness);
       float gZ = gridLine(p.y, gridSpacing, lineThickness);
 
-      // --- biome color (simple hashed bands + blends) ---
-      float b = fract(sin(p.x * 0.021 + p.y * 0.029) * 43758.5453);
+      // --- biome color (chunk-based hashed bands + blends) ---
+      // sample using discrete chunk coordinates so biomes are stable per chunk
+      vec2 p = vWorld.xz;
+      vec2 cell = floor(p / chunkSize);
+      float b = fract(sin(cell.x * 12.9898 + cell.y * 78.233) * 43758.5453);
+
       vec3 biome0 = vec3(0.55,0.75,0.35); // grass
       vec3 biome1 = vec3(0.92,0.82,0.50); // sand
       vec3 biome2 = vec3(0.42,0.70,0.95); // water
@@ -313,8 +319,11 @@ if (fireBtn) {
 // lightweight JS-side biome helper to keep minimap colors consistent with shader
 function frac(v){ return v - Math.floor(v); }
 function getBiomeColor(x, z){
-  // same simple hash as in shader to produce consistent biomes
-  const b = frac(Math.sin(x * 0.021 + z * 0.029) * 43758.5453);
+  // same simple hash as in shader to produce consistent biomes (chunk-based)
+  const CHUNK_SIZE = 8.0;
+  const cellX = Math.floor(x / CHUNK_SIZE);
+  const cellZ = Math.floor(z / CHUNK_SIZE);
+  const b = frac(Math.sin(cellX * 12.9898 + cellZ * 78.233) * 43758.5453);
   const biome0 = [0.55,0.75,0.35];
   const biome1 = [0.92,0.82,0.50];
   const biome2 = [0.42,0.70,0.95];
@@ -401,8 +410,8 @@ function drawMinimap(){
 
   // compute player's forward direction in world-space and convert to canvas rotation
   // We want forward=(0,0,-1) (world forward) to map to angle 0 (up on the minimap).
-  const forward = new THREE.Vector3(0,0,-1).applyQuaternion(player.quaternion).normalize().negate();
-  const angle = Math.atan2(-forward.z, forward.x);
+  const forward = new THREE.Vector3(0,0,-1).applyQuaternion(player.quaternion).normalize(); // <-- remove negate so forward is true facing
+  const angle = Math.atan2(forward.x, -forward.z); // <-- compute rotation so forward (-Z) => angle 0 (up)
   mmCtx.rotate(angle);
 
   // player body
