@@ -16,22 +16,6 @@ body{background:var(--bg);color:var(--accent);overflow:hidden;-webkit-font-smoot
   touch-action:none;
 }
 
-/* UI overlays */
-#ui{
-  position:fixed;
-  left:12px;
-  top:12px;
-  z-index:10;
-  background:var(--ui-bg);
-  padding:8px 12px;
-  border-radius:10px;
-  box-shadow:0 6px 18px rgba(10,10,10,0.08);
-  backdrop-filter: blur(6px);
-  max-width:70%;
-}
-#title{font-weight:700;letter-spacing:0.2px}
-#hint{font-size:13px;color:var(--muted);margin-top:6px}
-
 /* Joystick area bottom-left on mobile */
 #joystick{
   position:fixed;
@@ -82,7 +66,5 @@ body{background:var(--bg);color:var(--accent);overflow:hidden;-webkit-font-smoot
 @media (max-width:720px){
   #bottom-controls{ right:12px; bottom:12px; }
   .fire-button{ padding:16px 20px; font-size:17px; border-radius:16px; }
-  /* joystick remains bottom-left, fire is in UI at top-left; optionally user can move or we could add a bottom-right duplicate later */
-  #ui{left:10px;right:10px;max-width:unset}
-  #hint{font-size:12px}
+  /* joystick remains bottom-left; top UI removed */
 }
