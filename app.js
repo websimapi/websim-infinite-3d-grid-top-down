@@ -110,9 +110,16 @@ const gridMaterial = new THREE.ShaderMaterial({
       float gX = gridLine(p.x, gridSpacing, lineThickness);
       float gZ = gridLine(p.y, gridSpacing, lineThickness);
 
-      // combine grid
-      vec3 base = vec3(1.0); // white ground
-      vec3 col = base;
+      // --- biome color (simple hashed bands + blends) ---
+      float b = fract(sin(p.x * 0.021 + p.y * 0.029) * 43758.5453);
+      vec3 biome0 = vec3(0.55,0.75,0.35); // grass
+      vec3 biome1 = vec3(0.92,0.82,0.50); // sand
+      vec3 biome2 = vec3(0.42,0.70,0.95); // water
+      vec3 biome3 = vec3(0.60,0.60,0.60); // rock
+      vec3 biomeA = mix(biome0, biome1, smoothstep(0.15, 0.45, b));
+      vec3 biomeB = mix(biome2, biome3, smoothstep(0.45, 0.75, b));
+      vec3 col = mix(biomeA, biomeB, smoothstep(0.40, 0.60, b));
+      // --- end biome color ---
 
       // axis color overlay
       col = mix(col, axisColor, max(lineX, lineZ));
@@ -303,6 +310,33 @@ if (fireBtn) {
   fireBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); spawnBullet(); });
 }
 
+// lightweight JS-side biome helper to keep minimap colors consistent with shader
+function frac(v){ return v - Math.floor(v); }
+function getBiomeColor(x, z){
+  // same simple hash as in shader to produce consistent biomes
+  const b = frac(Math.sin(x * 0.021 + z * 0.029) * 43758.5453);
+  const biome0 = [0.55,0.75,0.35];
+  const biome1 = [0.92,0.82,0.50];
+  const biome2 = [0.42,0.70,0.95];
+  const biome3 = [0.60,0.60,0.60];
+  function mix(a,b,t){ return a*(1-t) + b*t; }
+  function smoothstep(a,b,x){
+    if (x <= a) return 0;
+    if (x >= b) return 1;
+    const u = (x - a) / (b - a);
+    return u * u * (3.0 - 2.0 * u);
+  }
+  const a = smoothstep(0.15, 0.45, b);
+  const c0 = [ mix(biome0[0], biome1[0], a), mix(biome0[1], biome1[1], a), mix(biome0[2], biome1[2], a) ];
+  const bb = smoothstep(0.45, 0.75, b);
+  const c1 = [ mix(biome2[0], biome3[0], bb), mix(biome2[1], biome3[1], bb), mix(biome2[2], biome3[2], bb) ];
+  const blend = smoothstep(0.40, 0.60, b);
+  const r = Math.round((mix(c0[0], c1[0], blend)) * 255);
+  const g = Math.round((mix(c0[1], c1[1], blend)) * 255);
+  const bl = Math.round((mix(c0[2], c1[2], blend)) * 255);
+  return `rgb(${r},${g},${bl})`;
+}
+
 // Draw a simple top-down minimap each frame
 function drawMinimap(){
   // compute current CSS size (kept in sync by resizeMinimap)
@@ -313,17 +347,28 @@ function drawMinimap(){
   // clear using CSS-space coordinates (canvas has been scaled by DPR in resize)
   mmCtx.clearRect(0, 0, w, h);
 
-  // background + border
-  mmCtx.fillStyle = 'rgba(255,255,255,0.92)';
-  mmCtx.fillRect(0,0,w,h);
-  mmCtx.strokeStyle = 'rgba(0,0,0,0.06)';
-  mmCtx.lineWidth = 1;
-  mmCtx.strokeRect(0.5,0.5,w-1,h-1);
-
-  // world-to-map transform: player at center
+  // background: sample biomes across the map to give a small "biome map"
   const viewRadius = 30; // world units shown from center to edge
   const scale = (Math.min(w,h) * 0.5 - 8) / viewRadius;
   const cx = w * 0.5, cy = h * 0.5;
+  const cols = 20;
+  const rows = Math.max(8, Math.round(cols * (h / w)));
+  const cellW = w / cols, cellH = h / rows;
+  for (let iy = 0; iy < rows; iy++){
+    for (let ix = 0; ix < cols; ix++){
+      const px = ix * cellW + cellW * 0.5;
+      const py = iy * cellH + cellH * 0.5;
+      const worldX = player.position.x + (px - cx) / scale;
+      const worldZ = player.position.z + (py - cy) / scale;
+      mmCtx.fillStyle = getBiomeColor(worldX, worldZ);
+      mmCtx.fillRect(Math.round(ix * cellW), Math.round(iy * cellH), Math.ceil(cellW)+1, Math.ceil(cellH)+1);
+    }
+  }
+
+  // border
+  mmCtx.strokeStyle = 'rgba(0,0,0,0.06)';
+  mmCtx.lineWidth = 1;
+  mmCtx.strokeRect(0.5,0.5,w-1,h-1);
 
   // draw subtle crosshair
   mmCtx.strokeStyle = 'rgba(0,0,0,0.06)';
@@ -357,7 +402,7 @@ function drawMinimap(){
   // compute player's forward direction in world-space and convert to canvas rotation
   // We want forward=(0,0,-1) (world forward) to map to angle 0 (up on the minimap).
   const forward = new THREE.Vector3(0,0,-1).applyQuaternion(player.quaternion).normalize().negate();
-  const angle = Math.atan2(forward.x, -forward.z);
+  const angle = Math.atan2(-forward.z, forward.x);
   mmCtx.rotate(angle);
 
   // player body
