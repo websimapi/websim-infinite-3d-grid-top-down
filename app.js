@@ -136,10 +136,6 @@ plane.rotation.x = -Math.PI / 2; // lay flat on XZ
 plane.position.y = 0;
 scene.add(plane);
 
-// Mini-map camera (angled, further out)
-const cameraMini = new THREE.PerspectiveCamera(50, 240 / 150, 0.1, 2000);
-cameraMini.up.set(0, 1, 0);
-
 // Resize handler
 function resize() {
   const w = window.innerWidth;
@@ -151,17 +147,23 @@ function resize() {
   camera.top = frustumSize / 2;
   camera.bottom = -frustumSize / 2;
   camera.updateProjectionMatrix();
-
-  // update minimap camera projection (size will be adjusted each frame too)
-  const frame = document.getElementById('minimap-frame');
-  if (frame) {
-    const rect = frame.getBoundingClientRect();
-    cameraMini.aspect = rect.width / rect.height;
-    cameraMini.updateProjectionMatrix();
-  }
 }
 window.addEventListener('resize', resize, { passive: true });
 resize();
+
+// Minimap setup: small top-right canvas showing player & bullets
+const minimap = document.getElementById('minimap');
+const mmCtx = minimap.getContext('2d');
+function resizeMinimap(){
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const cssW = Math.round(getComputedStyle(minimap).width.replace('px',''));
+  const cssH = Math.round(getComputedStyle(minimap).height.replace('px',''));
+  minimap.width = Math.max(64, cssW) * dpr;
+  minimap.height = Math.max(64, cssH) * dpr;
+  mmCtx.setTransform(dpr,0,0,dpr,0,0);
+}
+resizeMinimap();
+window.addEventListener('resize', resizeMinimap, { passive: true });
 
 // Input handling
 const keys = { ArrowUp:0, ArrowDown:0, ArrowLeft:0, ArrowRight:0, KeyW:0, KeyA:0, KeyS:0, KeyD:0 };
@@ -292,6 +294,69 @@ if (fireBtn) {
   fireBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); spawnBullet(); });
 }
 
+// Draw a simple top-down minimap each frame
+function drawMinimap(){
+  const w = minimap.width / (window.devicePixelRatio || 1);
+  const h = minimap.height / (window.devicePixelRatio || 1);
+  mmCtx.clearRect(0,0,w,h);
+  // background + border
+  mmCtx.fillStyle = 'rgba(255,255,255,0.9)';
+  mmCtx.fillRect(0,0,w,h);
+  mmCtx.strokeStyle = 'rgba(0,0,0,0.08)';
+  mmCtx.lineWidth = 1;
+  mmCtx.strokeRect(0.5,0.5,w-1,h-1);
+
+  // world-to-map transform: player at center
+  const viewRadius = 30; // world units shown from center to edge
+  const scale = (Math.min(w,h) * 0.5 - 8) / viewRadius;
+  const cx = w * 0.5, cy = h * 0.5;
+
+  // draw axes (camera-relative orientation not necessary; top = -Z)
+  mmCtx.strokeStyle = 'rgba(0,0,0,0.06)';
+  mmCtx.lineWidth = 1;
+  mmCtx.beginPath();
+  mmCtx.moveTo(cx - 4, cy);
+  mmCtx.lineTo(cx + 4, cy);
+  mmCtx.moveTo(cx, cy - 4);
+  mmCtx.lineTo(cx, cy + 4);
+  mmCtx.stroke();
+
+  // draw bullets
+  mmCtx.fillStyle = '#ff6b00';
+  for (let i = 0; i < bullets.length; i++){
+    const b = bullets[i].mesh.position;
+    const dx = (b.x - player.position.x) * scale;
+    const dz = (b.z - player.position.z) * scale;
+    const px = cx + dx;
+    const py = cy + dz;
+    // only draw if within map bounds (simple cull)
+    if (px < -8 || px > w+8 || py < -8 || py > h+8) continue;
+    mmCtx.beginPath();
+    mmCtx.arc(px, py, 3, 0, Math.PI*2);
+    mmCtx.fill();
+  }
+
+  // draw player at center with orientation arrow
+  mmCtx.save();
+  mmCtx.translate(cx, cy);
+  mmCtx.rotate(-player.rotation.y); // map top = -Z; rotate to match player
+  // player body
+  mmCtx.fillStyle = '#111';
+  mmCtx.beginPath();
+  mmCtx.moveTo(0, -6);
+  mmCtx.arc(0, 0, 6, 0, Math.PI*2);
+  mmCtx.fill();
+  // forward indicator
+  mmCtx.fillStyle = '#ff6b00';
+  mmCtx.beginPath();
+  mmCtx.moveTo(0,-10);
+  mmCtx.lineTo(4,-4);
+  mmCtx.lineTo(-4,-4);
+  mmCtx.closePath();
+  mmCtx.fill();
+  mmCtx.restore();
+}
+
 // Animation loop
 let last = performance.now();
 function animate(now) {
@@ -361,39 +426,10 @@ function animate(now) {
       continue;
     }
   }
+  // draw minimap overlay
+  drawMinimap();
 
   renderer.render(scene, camera);
-
-  // --- minimap render: angled, further-out top-down view in top-right ---
-  // compute viewport in device pixels
-  const DPR = renderer.getPixelRatio();
-  const frameEl = document.getElementById('minimap-frame');
-  if (frameEl) {
-    const rect = frameEl.getBoundingClientRect();
-    const vpW = Math.max(64, Math.floor(rect.width * DPR));
-    const vpH = Math.max(48, Math.floor(rect.height * DPR));
-    const vpX = Math.floor((rect.left) * DPR);
-    const vpY = Math.floor((window.innerHeight - rect.bottom) * DPR);
-
-    renderer.clearDepth(); // allow overlay render on top
-    renderer.setScissorTest(true);
-    renderer.setScissor(vpX, vpY, vpW, vpH);
-    renderer.setViewport(vpX, vpY, vpW, vpH);
-
-    // position minimap camera relative to player for a more angled, farther-out view
-    const miniOffset = new THREE.Vector3(0, 38, 38);
-    cameraMini.position.copy(player.position).add(miniOffset);
-    cameraMini.lookAt(player.position);
-    cameraMini.updateMatrixWorld();
-
-    renderer.render(scene, cameraMini);
-
-    // restore full canvas state
-    renderer.setScissorTest(false);
-    renderer.setViewport(0, 0, Math.floor(window.innerWidth * DPR), Math.floor(window.innerHeight * DPR));
-  }
-  // --- end minimap ---
-
   requestAnimationFrame(animate);
 }
 requestAnimationFrame(animate);
