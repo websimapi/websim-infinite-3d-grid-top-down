@@ -66,9 +66,22 @@ body{background:var(--bg);color:var(--accent);overflow:hidden;-webkit-font-smoot
 }
 .fire-button:active{ transform: scale(0.98); box-shadow:0 4px 8px rgba(0,0,0,0.08); }
 
-/* Make button larger on small screens and place it within easy thumb reach */
+/* bottom-right fixed fire button wrapper */
+#bottom-controls{
+  position:fixed;
+  right:18px;
+  bottom:18px;
+  z-index:13;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  pointer-events:auto;
+}
+
+/* slightly larger button for thumbs on small screens */
 @media (max-width:720px){
-  .fire-button{ padding:14px 18px; font-size:16px; border-radius:14px; }
+  #bottom-controls{ right:12px; bottom:12px; }
+  .fire-button{ padding:16px 20px; font-size:17px; border-radius:16px; }
   /* joystick remains bottom-left, fire is in UI at top-left; optionally user can move or we could add a bottom-right duplicate later */
   #ui{left:10px;right:10px;max-width:unset}
   #hint{font-size:12px}

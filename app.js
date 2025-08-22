@@ -231,8 +231,8 @@ const bulletMat = new THREE.MeshStandardMaterial({ color: 0xff6b00, emissive: 0x
 
 // spawnBullet: create a bullet in front of the player and give it velocity
 function spawnBullet(){
-  // forward in world space (player's local -Z)
-  const forward = new THREE.Vector3(0,0,-1).applyQuaternion(player.quaternion).normalize();
+  // forward in world space (player's local -Z), reversed so bullets come from the opposite side and go the opposite direction
+  const forward = new THREE.Vector3(0,0,-1).applyQuaternion(player.quaternion).normalize().negate();
   const start = new THREE.Vector3().copy(player.position).add(forward.clone().multiplyScalar(1.1));
   start.y += 0.5;
   const mesh = new THREE.Mesh(bulletGeo, bulletMat.clone());
