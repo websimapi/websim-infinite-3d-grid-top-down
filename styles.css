@@ -44,9 +44,32 @@ body{background:var(--bg);color:var(--accent);overflow:hidden;-webkit-font-smoot
   display:none; /* shown when touch input detected by JS */
 }
 
-/* Minimal responsive tweaks */
+#controls{
+  margin-top:8px;
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+
+/* Fire button styling - large and thumb-friendly on mobile */
+.fire-button{
+  background:#111;
+  color:#fff;
+  border:none;
+  padding:10px 14px;
+  border-radius:10px;
+  font-weight:700;
+  cursor:pointer;
+  box-shadow:0 6px 12px rgba(17,17,17,0.12);
+  transition: transform 0.08s ease, box-shadow 0.12s ease, opacity 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+.fire-button:active{ transform: scale(0.98); box-shadow:0 4px 8px rgba(0,0,0,0.08); }
+
+/* Make button larger on small screens and place it within easy thumb reach */
 @media (max-width:720px){
+  .fire-button{ padding:14px 18px; font-size:16px; border-radius:14px; }
+  /* joystick remains bottom-left, fire is in UI at top-left; optionally user can move or we could add a bottom-right duplicate later */
   #ui{left:10px;right:10px;max-width:unset}
   #hint{font-size:12px}
 }
-

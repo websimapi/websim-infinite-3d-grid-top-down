@@ -155,6 +155,7 @@ window.addEventListener('keydown', (e) => {
   if (keys.hasOwnProperty(e.code)) keys[e.code] = 1;
   if (e.code === 'KeyQ') cameraYaw += 0.08;
   if (e.code === 'KeyE') cameraYaw -= 0.08;
+  if (e.code === 'Space') { e.preventDefault(); spawnBullet(); }
 });
 window.addEventListener('keyup', (e) => {
   if (keys.hasOwnProperty(e.code)) keys[e.code] = 0;
@@ -221,6 +222,34 @@ function setupJoystick(){
 }
 setupJoystick();
 
+// bullets storage + basic shared geometry/material
+const bullets = [];
+const BULLET_SPEED = 25;
+const BULLET_LIFETIME = 2.5;
+const bulletGeo = new THREE.SphereGeometry(0.12, 8, 8);
+const bulletMat = new THREE.MeshStandardMaterial({ color: 0xff6b00, emissive: 0xff6b00, emissiveIntensity: 0.6, metalness: 0.1, roughness: 0.4 });
+
+// spawnBullet: create a bullet in front of the player and give it velocity
+function spawnBullet(){
+  // forward in world space (player's local -Z)
+  const forward = new THREE.Vector3(0,0,-1).applyQuaternion(player.quaternion).normalize();
+  const start = new THREE.Vector3().copy(player.position).add(forward.clone().multiplyScalar(1.1));
+  start.y += 0.5;
+  const mesh = new THREE.Mesh(bulletGeo, bulletMat.clone());
+  mesh.position.copy(start);
+  scene.add(mesh);
+  bullets.push({ mesh, vel: forward.clone().multiplyScalar(BULLET_SPEED), life: BULLET_LIFETIME });
+  // tiny visual feedback (quick scale pulse)
+  player.scale.set(1.02,1.02,1.02);
+  setTimeout(()=> player.scale.set(1,1,1), 90);
+}
+
+// hook the UI button and spacebar to fire
+const fireBtn = document.getElementById('fire');
+if (fireBtn) {
+  fireBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); spawnBullet(); });
+}
+
 // Animation loop
 let last = performance.now();
 function animate(now) {
@@ -275,6 +304,22 @@ function animate(now) {
   // Update shader cameraPos uniform for proper fading
   gridMaterial.uniforms.cameraPos.value.copy(player.position);
 
+  // Update bullets: advance, lifetime, cleanup
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    const b = bullets[i];
+    // move
+    b.mesh.position.addScaledVector(b.vel, dt);
+    // simple lifetime
+    b.life -= dt;
+    if (b.life <= 0) {
+      // remove mesh and dispose material (geometry is shared)
+      scene.remove(b.mesh);
+      if (b.mesh.material) b.mesh.material.dispose();
+      bullets.splice(i, 1);
+      continue;
+    }
+  }
+
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
 }
@@ -282,4 +327,3 @@ requestAnimationFrame(animate);
 
 // Initial resize to set sizes correctly
 resize();
-
